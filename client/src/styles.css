@@ -1,0 +1,8 @@
+body{font-family: Inter, system-ui, Arial; background:#f3f4f6; margin:0;}
+.container{max-width:900px;margin:30px auto;padding:20px}
+.card{background:white;padding:20px;border-radius:12px;box-shadow:0 6px 18px rgba(0,0,0,0.08)}
+input, textarea{width:100%;padding:8px;margin:6px 0;border-radius:6px;border:1px solid #ddd}
+.primary{background:#2563eb;color:white;padding:8px 12px;border-radius:8px;border:none}
+.logBox{max-height:220px;overflow:auto;background:#fff;padding:8px;border-radius:6px}
+button{padding:8px 10px;border-radius:8px;border:1px solid #ddd;background:#fff;cursor:pointer}
+button:disabled{opacity:0.6;cursor:not-allowed}
