@@ -23,3 +23,22 @@ Backend asks follow-ups (cross-questions) based on answer context and keeps an e
 Interview lasts configurable duration (default 18 minutes).
 
 At the end, backend generates a summary and a pass/fail recommendation and stores it in Supabase.
+
+## Codebase index
+
+- `server/` — Node.js + Express API with Socket.IO transport, interview session orchestration, and Supabase persistence.
+  - `server.js` — Express server + socket wiring.
+  - `interviewManager.js` — Session model, OpenAI follow-up generation, and recommendation synthesis.
+  - `supabaseClient.js` — Thin client factory for Supabase.
+- `client/` — Vite React front end.
+  - `src/App.jsx` — Landing/onboarding + resume file upload flow.
+  - `src/Interview.jsx` — Live interview cockpit, camera feed, hover effects for speech/listening states.
+  - `src/styles.css` — Design system, card layouts, hover/speaking/listening animations.
+  - `src/utils/api.js` — Helper for REST calls (currently used for future extensibility).
+
+## Recent UX improvements
+
+- Resume upload now accepts drag-and-drop inspired file input (TXT, DOC, DOCX, PDF) to remove manual pasting.
+- Live camera feed stays on throughout the interview; reconnect button will restart the stream if permissions change.
+- Bot speaking/listening states animate with hover-responsive pulses so interviewers instantly perceive vocal activity.
+- Control surface redesigned with pills, gradients, and transcript chips for quicker operator feedback.
