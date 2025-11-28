@@ -73,4 +73,4 @@ io.on('connection', (socket) => {
 
 app.get('/', (req,res)=>res.json({status:'ok'}));
 
-server.listen(PORT, ()=> console.log('Server listening on
+server.listen(PORT, ()=> console.log('Server listening on http://localhost:'+PORT));
