@@ -3,8 +3,21 @@ import Interview from './Interview'
 
 export default function App() {
   const [started, setStarted] = useState(false);
-  const [role, setRole] = useState('Frontend Engineer');
+  const roles = [
+    'Frontend Engineer',
+    'Backend Engineer',
+    'Fullstack Engineer',
+    'Data Scientist',
+    'Machine Learning Engineer',
+    'DevOps Engineer',
+    'Mobile Engineer',
+    'QA Engineer',
+    'Security Engineer',
+    'Product Manager'
+  ];
+  const [role, setRole] = useState(roles[0]);
   const [resumeText, setResumeText] = useState('');
+  const [initialStream, setInitialStream] = useState(null);
   const [resumeName, setResumeName] = useState('');
   const [error, setError] = useState('');
 
@@ -61,11 +74,9 @@ export default function App() {
       {!started ? (
         <div className="card onboarding">
           <label className="fieldLabel">Job Role</label>
-          <input
-            value={role}
-            onChange={e => setRole(e.target.value)}
-            placeholder="e.g. Senior Frontend Engineer"
-          />
+          <select value={role} onChange={e => setRole(e.target.value)}>
+            {roles.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
 
           <label className="fieldLabel">Upload candidate resume</label>
           <div className="fileInput">
@@ -89,14 +100,28 @@ export default function App() {
 
           <button
             className="primary"
-            onClick={() => setStarted(true)}
+            onClick={async () => {
+              setError('');
+              if (!resumeText || error) return;
+              // Prompt camera/mic permission synchronously from the user gesture
+              if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                try {
+                  const s = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+                  setInitialStream(s);
+                } catch (e) {
+                  setError('Unable to access camera/microphone. Please allow permissions to continue.');
+                  return;
+                }
+              }
+              setStarted(true);
+            }}
             disabled={!resumeText || !!error}
           >
             Launch Interview
           </button>
         </div>
       ) : (
-        <Interview role={role} resume={resumeText} onRestart={() => setStarted(false)} />
+        <Interview role={role} resume={resumeText} onRestart={() => setStarted(false)} initialStream={initialStream} />
       )}
     </div>
   )

@@ -39,6 +39,49 @@ class InterviewSession {
     return a;
   }
 
+  async generateInitialQuestion(){
+    // Analyze resume and generate first question tailored to the role and experience
+    const prompt = `You are an experienced technical interviewer. Candidate role: ${this.role}. 
+
+Resume:
+${this.resume}
+
+Based on this resume and the role of ${this.role}, generate an opening question to assess the candidate's readiness for this position. The question should be specific to their background and experience shown in the resume.
+
+Respond in JSON format with these keys:
+- question: A clear, specific opening question (string)
+- key_topic: The main skill/experience area you're testing (string)
+
+Make the question conversational and focused on their most relevant experience from the resume.`;
+
+    try{
+      console.log('Calling OpenAI with model:', process.env.OPENAI_MODEL);
+      const resp = await openai.chat.completions.create({
+        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+        messages: [{role:'system', content:'You are an expert AI technical interviewer who asks thoughtful, resume-aware questions.'}, {role:'user', content: prompt}],
+        max_tokens: 300,
+        temperature: 0.7
+      });
+
+      console.log('OpenAI response received:', resp.choices?.[0]?.message?.content?.substring(0, 100));
+      const txt = resp.choices?.[0]?.message?.content || '';
+      const jsonStart = txt.indexOf('{');
+      const extracted = jsonStart>=0 ? txt.slice(jsonStart) : txt;
+      console.log('Extracted text:', extracted.substring(0, 100));
+      const parsed = JSON.parse(extracted);
+      
+      const questionText = parsed.question || `Tell me about your experience relevant to the role of ${this.role}.`;
+      if(parsed.key_topic) this.keyPoints.push(`Starting topic: ${parsed.key_topic}`);
+      
+      console.log('Generated question:', questionText);
+      return { id: 'q_1', text: questionText, askedAt: nowISO() };
+    }catch(e){
+      console.error('Error generating initial question:', e.message || e);
+      console.error('Full error:', e);
+      return { id: 'q_1', text: `Tell me about your experience relevant to the role of ${this.role}.`, askedAt: nowISO() };
+    }
+  }
+
   async requestFollowupAndKeypoints(lastAnswer){
     // Call LLM to suggest follow-up + extract key-points
     const prompt = `You are an experienced technical interviewer. Candidate role: ${this.role}. Resume: ${this.resume}\n\nLast question-answer pair:\nQ: ${this.questions[this.questions.length-1].text}\nA: ${lastAnswer}\n\nRespond in JSON with keys: followup (a short follow-up question or empty), key_points (array of 3 short bullets learned from the answer).`;

@@ -1,3 +1,5 @@
+const PORT = process.env.PORT || 4000;
+const HOST = process.env.HOST || '0.0.0.0';
 require('dotenv').config();
 const express = require('express');
 const http = require('http');
@@ -14,24 +16,68 @@ app.use(bodyParser.json());
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
 
-const PORT = process.env.PORT || 4000;
-
 // In-memory sessions (for demo). In production persist sessions.
 const sessions = new Map();
 
 io.on('connection', (socket) => {
   console.log('socket connected', socket.id);
 
-  socket.on('create_session', ({role, resume, durationMin}) => {
+  socket.on('create_session', async ({role, resume, durationMin}) => {
+    console.log('create_session event received', {role, resumeLength: resume?.length, durationMin});
     const id = 's_' + Date.now();
     const session = new InterviewSession({id, role, resume, durationMin});
     session.startNow();
-    sessions.set(id, session);
-    socket.join(id);
-    // Create an initial starter question via LLM
-    session.addQuestion(`Tell me about your experience relevant to the role of ${role}.`);
 
-    io.to(id).emit('session_created', { sessionId: id, start: session.start, end: session.end, firstQuestion: session.questions[0] });
+    // Generate an initial question by analyzing the resume
+    try {
+      console.log('Generating initial question...');
+      const initialQuestion = await session.generateInitialQuestion();
+      console.log('Initial question generated:', initialQuestion);
+      session.questions.push(initialQuestion);
+      sessions.set(id, session);
+      socket.join(id);
+      console.log('Emitting session_created event...');
+      io.to(id).emit('session_created', { sessionId: id, start: session.start, end: session.end, firstQuestion: initialQuestion });
+      console.log('Session created:', id, 'First question:', initialQuestion.text);
+    } catch (e) {
+      console.error('Error generating initial question:', e);
+      // Fallback to generic question
+      const fallbackQuestion = { id: 'q_1', text: `Tell me about your experience relevant to the role of ${role}.`, askedAt: new Date().toISOString() };
+      session.questions.push(fallbackQuestion);
+      sessions.set(id, session);
+      socket.join(id);
+      io.to(id).emit('session_created', { sessionId: id, start: session.start, end: session.end, firstQuestion: fallbackQuestion });
+    }
+
+    // If resume is empty or not helpful, add a small set of default role-based questions
+    const roleKey = (role || '').toLowerCase();
+    const defaults = {
+      frontend: [
+        'Describe a challenging UI you built and how you handled responsiveness and accessibility.',
+        'How do you optimize page load performance and rendering in modern browsers?'
+      ],
+      backend: [
+        'Describe a scalable backend system you designed and the trade-offs you made.',
+        'How do you approach data modeling and performance for high-throughput services?'
+      ],
+      data: [
+        'Tell me about a data pipeline you built and how you handled data quality.',
+        'How do you validate and monitor model performance or data drift?'
+      ],
+      devops: [
+        'Describe how you would design CI/CD for a microservices platform.',
+        'How do you monitor and respond to production incidents?' 
+      ],
+      product: [
+        'How do you gather requirements and measure product success?',
+        'Tell me about a time you prioritized competing stakeholder requests.'
+      ]
+    };
+
+    const matched = Object.keys(defaults).find(k => roleKey.includes(k));
+    if ((!resume || !resume.trim()) && matched) {
+      defaults[matched].forEach(q => session.addQuestion(q));
+    }
   });
 
   socket.on('candidate_answer', async ({ sessionId, questionId, transcript }) => {
@@ -73,4 +119,4 @@ io.on('connection', (socket) => {
 
 app.get('/', (req,res)=>res.json({status:'ok'}));
 
-server.listen(PORT, ()=> console.log('Server listening on http://localhost:'+PORT));
+server.listen(PORT, HOST, ()=> console.log(`Server listening on http://${HOST}:${PORT}`));
