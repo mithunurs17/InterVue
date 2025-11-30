@@ -24,6 +24,17 @@ function resolveServerUrl() {
 const SERVER = resolveServerUrl();
 console.info('InterVue: connecting to server at', SERVER);
 
+// Conversation and timing settings
+const SILENCE_TIMEOUT_MS = 2500; // how long of silence before we treat as end of answer
+const AUTO_LISTEN_DELAY_MS = 600; // pause after TTS before starting STT
+const CONVERSATIONAL_PREFACES = [
+  'Great. ',
+  'Alright. ',
+  'Thanks — ',
+  'Okay, next: ',
+  'Could you tell me: '
+];
+
 // Role-based fallback questions used when server/socket is unreachable.
 const ROLE_QUESTIONS = {
   'Frontend Engineer': [
@@ -221,6 +232,8 @@ export default function Interview({ role, resume, onRestart, initialStream }) {
   const [lastTranscript, setLastTranscript] = useState('');
 
   const recognitionRef = useRef(null);
+  const resultReceivedRef = useRef(false);
+  const silenceTimerRef = useRef(null);
   const synthRef = useRef(window.speechSynthesis);
   const videoRef = useRef(null);
   const streamRef = useRef(null);
@@ -332,6 +345,8 @@ export default function Interview({ role, resume, onRestart, initialStream }) {
       if (recognitionRef.current) recognitionRef.current.abort();
       synthRef.current?.cancel?.();
       streamRef.current?.getTracks().forEach(track => track.stop());
+      try { silenceTimerRef.current && clearTimeout(silenceTimerRef.current); } catch(e){}
+      try { followupTimeoutRef.current && clearTimeout(followupTimeoutRef.current); } catch(e){}
     };
   }, [ensureMediaAccess]);
 
@@ -357,10 +372,9 @@ export default function Interview({ role, resume, onRestart, initialStream }) {
       console.log('Speech ended, autoListen:', autoListen);
       setIsSpeaking(false);
       if (autoListen) {
-        // smaller delay so the end of TTS isn't captured by STT
         setTimeout(() => {
           startListenAndSend();
-        }, 200);
+        }, AUTO_LISTEN_DELAY_MS);
       }
     };
     ut.onerror = (e) => {
@@ -371,7 +385,8 @@ export default function Interview({ role, resume, onRestart, initialStream }) {
   }
 
   function speakQuestion(text) {
-    speak(text, { autoListen: true });
+    const pre = CONVERSATIONAL_PREFACES[Math.floor(Math.random() * CONVERSATIONAL_PREFACES.length)];
+    speak(pre + text, { autoListen: true });
   }
 
   function startSession() {
@@ -421,11 +436,23 @@ export default function Interview({ role, resume, onRestart, initialStream }) {
     rec.lang = 'en-US';
     rec.interimResults = false;
     rec.maxAlternatives = 1;
+    // Mark recognition started
     rec.onstart = () => {
       setIsListening(true);
+      resultReceivedRef.current = false;
+      // clear any previous silence timer
+      try { silenceTimerRef.current && clearTimeout(silenceTimerRef.current); } catch(e){}
       appendLog('Listening started — speak now');
     };
+
+    // Stop listening when browser detects speech ended (user stopped speaking)
+    rec.onspeechend = () => {
+      try { rec.stop(); } catch (e) {}
+      appendLog('Speech end detected');
+    };
+
     rec.onresult = (ev) => {
+      resultReceivedRef.current = true;
       const transcript = ev.results[0][0].transcript;
       setLastTranscript(transcript);
       appendLog('Heard: ' + transcript);
@@ -497,9 +524,74 @@ export default function Interview({ role, resume, onRestart, initialStream }) {
       setIsListening(false);
       appendLog('Recognition error: ' + (e.error || e.message));
     };
+
+    // onend: if no result was received (user was silent), wait a configurable silence timeout
     rec.onend = () => {
       setIsListening(false);
       appendLog('Listening ended');
+      // If no result captured, start a silence timeout before treating it as an empty answer
+      if (!resultReceivedRef.current) {
+        appendLog(`No speech captured — will treat as end after ${SILENCE_TIMEOUT_MS}ms of silence`);
+        try { silenceTimerRef.current && clearTimeout(silenceTimerRef.current); } catch(e){}
+        silenceTimerRef.current = setTimeout(() => {
+          appendLog('Silence timeout elapsed — advancing as empty answer');
+          const transcript = '';
+          // If server connected, still send an empty answer to trigger followup behavior
+          if (socketConnected && socket && sessionId && currentQuestion) {
+            try { localAnswersRef.current.push({ questionId: currentQuestion?.id, transcript }); } catch (e) {}
+            socket.emit('candidate_answer', { sessionId, questionId: currentQuestion.id, transcript });
+            appendLog('Sent empty answer to server');
+            // start fallback timer to move on if no followup
+            try { followupTimeoutRef.current && clearTimeout(followupTimeoutRef.current); } catch(e){}
+            followupTimeoutRef.current = setTimeout(() => {
+              appendLog('No follow-up received from server after empty answer — fallback progression');
+              if (!localQuestionsRef.current || !localQuestionsRef.current.length) {
+                localQuestionsRef.current = ROLE_QUESTIONS[role] || [{ id: 'dft1', text: 'Tell me about your most recent work.' }];
+                localIndexRef.current = 0;
+              }
+              const nextIndex = localIndexRef.current + 1;
+              if (nextIndex < localQuestionsRef.current.length) {
+                localIndexRef.current = nextIndex;
+                const nextQ = localQuestionsRef.current[nextIndex];
+                setCurrentQuestion(nextQ);
+                appendLog('Fallback next question: ' + nextQ.text);
+                speakQuestion(nextQ.text);
+              } else {
+                appendLog('Fallback: no more local questions available');
+                speak('I have no further questions at this time.');
+              }
+            }, 5000);
+            return;
+          }
+
+          // Local-only session: advance after silence
+          if (sessionId && sessionId.startsWith('local-')) {
+            localAnswersRef.current.push({ questionId: currentQuestion?.id, transcript });
+            const nextIndex = localIndexRef.current + 1;
+            if (nextIndex < localQuestionsRef.current.length) {
+              localIndexRef.current = nextIndex;
+              const nextQ = localQuestionsRef.current[nextIndex];
+              setCurrentQuestion(nextQ);
+              appendLog('Local next question (silence): ' + nextQ.text);
+              speakQuestion(nextQ.text);
+            } else {
+              appendLog('Local interview complete (silence path) — compiling summary');
+              setInterviewFinished(true);
+              setSessionActive(false);
+              const analysis = localAnalyze(localAnswersRef.current, role || 'Unknown');
+              const recommendation = {
+                recommendation: analysis.recommendation,
+                score: analysis.score,
+                summary: analysis.summary,
+                strengths: analysis.strengths,
+                weaknesses: analysis.weaknesses
+              };
+              setResult(recommendation);
+              speak('Interview complete. ' + analysis.summary + ' Recommendation: ' + analysis.recommendation);
+            }
+          }
+        }, SILENCE_TIMEOUT_MS);
+      }
     };
     recognitionRef.current = rec;
     rec.start();
