@@ -515,3 +515,37 @@ button {
     gap: 16px;
   }
 }
+
+/* Additional modern overrides */
+:root { --glass-border: rgba(2,6,23,0.04); }
+.container { padding: 32px 20px; }
+
+/* Make video area more polished */
+.videoShell { border-radius: 14px; box-shadow: 0 12px 40px rgba(2,6,23,0.25) inset; border: 1px solid rgba(255,255,255,0.03); }
+.videoFeed { border-radius: 8px; }
+
+/* Controls layout polish */
+.controls { align-items: center; }
+.controls button { transition: transform 120ms ease, box-shadow 180ms ease; }
+
+/* Bot area tweaks */
+.botState { padding: 18px; }
+.botAvatar { width:72px; height:72px }
+.botFace { width:60px; height:60px }
+
+/* Transcript box improvements */
+.transcriptBox { font-size:0.98rem; color:#06202b; min-height:56px; display:flex; align-items:center }
+
+/* Log box scroll thumb */
+.logBox::-webkit-scrollbar { height:8px; width:8px }
+.logBox::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.06); border-radius:8px }
+
+/* Result presentation */
+.result { border-radius:14px; }
+.resultHeader h3 { margin:0 }
+
+/* Small responsive tweaks */
+@media (max-width: 560px) {
+  .controls button { min-width: 100%; }
+  .interviewHeader { flex-direction:column; gap:12px }
+}
