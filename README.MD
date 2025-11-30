@@ -2,6 +2,27 @@ InterVue — Full Interview Agent
 
 A complete, copy-pasteable project you can open in VS Code. Stack chosen for clarity and fast setup:
 
+## Overview of the Agent
+
+**InterVue** is an intelligent interview preparation agent designed to assist users in practicing, learning, and improving their interview skills. The agent provides interactive mock interview sessions, evaluates responses, and offers feedback to prepare candidates for real-world interviews.
+
+## Features & Limitations
+
+### Features
+- Interactive, scenario-based mock interview sessions.
+- Real-time feedback and evaluation of answers.
+- Customizable interview topics and technical domains.
+- Recording and tracking of user progress over sessions.
+- Integration with external APIs for up-to-date interview questions.
+
+### Limitations
+- Currently supports only a finite set of pre-configured interview topics.
+- Feedback may lack deep personalization.
+- Does not guarantee job placement or success in actual interviews.
+- Best used as a supplement, not a replacement, for human mock interviewers.
+
+## Tech Stack & APIs Used
+
 Backend: Node.js + Express + Socket.io
 
 LLM: OpenAI (uses an API key you provide). Easily replaceable with Claude/Gemini by swapping the API calls.
@@ -36,9 +57,57 @@ At the end, backend generates a summary and a pass/fail recommendation and store
   - `src/styles.css` — Design system, card layouts, hover/speaking/listening animations.
   - `src/utils/api.js` — Helper for REST calls (currently used for future extensibility).
 
+## Setup & Run Instructions
+
+1. **Clone the repository:**
+    ```bash
+    git clone https://github.com/mithunurs17/InterVue.git
+    cd InterVue
+    ```
+
+2. **Install dependencies:**
+    ```bash
+    npm install
+    ```
+    _or with yarn:_
+    ```bash
+    yarn install
+    ```
+
+3. **Configure environment variables:**  
+   Copy the example environment file and modify as needed:
+    ```bash
+    cp .env.example .env
+    ```
+   - Add any required API keys for GPT or question sources.
+    
+4. **Run the application:**
+    ```bash
+    npm start
+    ```
+    _or, for a development server:_
+    ```bash
+    npm run dev
+    ```
+
+5. **Access the App:**  
+   Visit [http://localhost:3000](http://localhost:3000) in your browser.
+
+
 ## Recent UX improvements
 
 - Resume upload now accepts drag-and-drop inspired file input (TXT, DOC, DOCX, PDF) to remove manual pasting.
 - Live camera feed stays on throughout the interview; reconnect button will restart the stream if permissions change.
 - Bot speaking/listening states animate with hover-responsive pulses so interviewers instantly perceive vocal activity.
 - Control surface redesigned with pills, gradients, and transcript chips for quicker operator feedback.
+
+
+## Potential Improvements
+
+- Broaden the range of topics and domains supported.
+- Enhance personalization of interview feedback and scoring.
+- Add support for voice- or video-based interviews.
+- Integrate with job boards or resume parsing tools.
+- Enable multi-language support.
+- Allow scheduling of interviews with peers or mentors.
+- Improve analytics and reporting of progress.
